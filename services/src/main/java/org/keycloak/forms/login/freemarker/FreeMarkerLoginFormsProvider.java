@@ -58,6 +58,7 @@ import org.keycloak.theme.FreeMarkerException;
 import org.keycloak.theme.FreeMarkerUtil;
 import org.keycloak.theme.Theme;
 import org.keycloak.theme.beans.AdvancedMessageFormatterMethod;
+import org.keycloak.theme.beans.LinkExpirationFormatterMethod;
 import org.keycloak.theme.beans.LocaleBean;
 import org.keycloak.theme.beans.MessageBean;
 import org.keycloak.theme.beans.MessageFormatterMethod;
@@ -80,6 +81,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static org.keycloak.models.UserModel.RequiredAction.UPDATE_PASSWORD;
 
@@ -136,8 +138,13 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
     @Override
     public Response createResponse(UserModel.RequiredAction action) {
 
+        int validityInSecs = realm.getActionTokenGeneratedByUserLifespan("verify-email");
+        long expirationInMinutes = TimeUnit.SECONDS.toMinutes(validityInSecs);
         String actionMessage;
         LoginFormsPages page;
+
+        logger.error("OLIVIER validityInSecs %d", validityInSecs);
+        logger.error("OLIVIER expirationInMinutes %ld", expirationInMinutes);
 
         switch (action) {
             case CONFIGURE_TOTP:
@@ -158,6 +165,17 @@ public class FreeMarkerLoginFormsProvider implements LoginFormsProvider {
                 break;
             case VERIFY_EMAIL:
                 actionMessage = Messages.VERIFY_EMAIL;
+                logger.error("OLIVIER adding linkExpiration");
+                this.attributes.put("linkExpiration", 12345);
+                logger.error("OLIVIER done adding linkExpiration");
+                try {
+		    logger.error("OLIVIER adding linkExpirationFormatter");
+		    Locale locale = session.getContext().resolveLocale(user);
+		    this.attributes.put("linkExpirationFormatter", new LinkExpirationFormatterMethod(getTheme().getMessages(locale), locale));
+		    logger.error("OLIVIER done adding linkExpirationFormatter");
+		} catch (IOException e) {
+		    throw new RuntimeException("Failed to put formatter");
+		}
                 page = LoginFormsPages.LOGIN_VERIFY_EMAIL;
                 break;
             default:
